@@ -1,0 +1,207 @@
+<html>
+
+    <link rel="stylesheet" href="css/style.css"/>
+    <script src="js/jquery.min.js"></script>
+    <script src="js/paper.js"></script>
+
+    <body class="fullscreen">
+
+	<nav>
+	    <input id="visibility" name="visibility" type="checkbox" checked="true"/>
+	    <label for="visibility" id="lightSwitch" class="myButton"></label>
+	    <div class="clearfix"></div>
+	    <br>
+
+	    <div id="randomImage" class="myButtonHalf"><img src="icons/random.svg" width="100%"></div>
+
+	    <label for="fileUpload" class="myButtonHalf"><img src="icons/folder.svg" width="100%"></label>
+	    <div id="userActions">
+		<input type="file" id="fileUpload">
+	    </div>
+	    <div class="clearfix"></div>
+
+	    <input type="radio" name="pen" value="10" id="bigPen" checked=true/>
+	    <label class="myButtonHalf colorBox" for="bigPen"><img src="icons/brush.svg" width="100%"></label>
+
+	    <input type="radio" name="pen" value="3" id="smallPen"/>
+	    <label class="myButtonHalf colorBox" for="smallPen"><img src="icons/pencil.svg" width="100%"></label>
+
+	    <div id="paletteBox">
+	    </div>
+
+	    <div class="clearfix"></div>
+
+	    <a id="download" class="myButton"><img src="icons/save.svg" width="100%"></a>
+
+	</nav>
+
+	<article>
+	    <div class="paperscript">
+		<canvas resize="true" id="LightTracer"></canvas>
+	    </div>
+	</article>
+
+	<script>
+	 // Create palette box
+	 colors = ["crimson", "orange", "gold", "forestgreen", "steelblue", "darkorchid", "orchid", "white", "grey"]
+	 for (var i = 0; i < colors.length; i++) {
+	     d = document.getElementById("paletteBox").innerHTML
+	     document.getElementById("paletteBox").innerHTML = d + '<input type="radio" name="color" value="' + colors[i] +'" id="' + i + '"/><label class="colorBox" for="' + i + '" style="background-color:' + colors[i] + '"></label>'
+	 }
+
+	 d = document.getElementById("paletteBox").innerHTML
+	 document.getElementById("paletteBox").innerHTML = d + '<input checked=true type="radio" name="color" value="black" id="defaultColor"/><label class="colorBox" for="defaultColor" style="background-color:black"></label>'
+	</script>
+
+      	<script type="text/paperscript" canvas="LightTracer">
+	 var path;
+	 var raster;
+	 var images = ['img/cat.jpg', 'img/flowers.jpg', 'img/hands.jpg', 'img/koi.jpg', 'img/woman.jpg'];
+
+	 // init
+	 var imageSrc = images[Math.floor(Math.random()*images.length)];
+	 var loaded = false;
+	 var penWidth = 10;
+	 var color = "black";
+	 var visible = true;
+
+	 function getRandomImage() {
+	     imageSrc = images[Math.floor(Math.random()*images.length)];
+	     setImage(imageSrc);
+	 }
+	 function setImage(imageSrc) {
+	     raster = new Raster(imageSrc);
+	     // Move the raster to the center of the view
+	     raster.position = view.center;
+	     raster.opacity = 0.5;
+	     // Resize
+	     raster.on('load', function() {
+		 loaded = true;
+		 onResize();
+	     });
+	 }
+	 function onResize(event) {
+	     if (!loaded)
+		 return;
+	     raster.fitBounds(view.bounds);
+	 }
+	 function toggleVisibility() {
+	     raster.visible = visible;
+	 }
+
+	 function onMouseDown(event) {
+	     // If we produced a path before, deselect it:
+	     if (path) {
+		path.selected = false;
+	     }
+
+	     // Create a new path and set its stroke color to black:
+	     path = new Path({
+		 segments: [event.point],
+		 strokeColor: color,
+		 // Select the path, so we can see its segment points:
+		 fullySelected: false,
+		 strokeWidth: penWidth,
+		 strokeCap: 'round'
+	     });
+	 }
+
+	 // While the user drags the mouse, points are added to the path
+	 // at the position of the mouse:
+	 function onMouseDrag(event) {
+	     path.add(event.point);
+	 }
+
+	 // When the mouse is released, we simplify the path
+	 function onMouseUp(event) {
+	     // When the mouse is released, simplify it
+	     path.simplify(10);
+
+	     // Must be closed
+	     // path.closed = true;
+
+	     // Do not see segments
+	     path.fullySelected = false;
+
+	     // Fill
+	     // path.fillColor = color;
+	 }
+
+	 $('input:radio[name=color]').change(function () {
+             color = $(this).val();
+             //console.log(color);
+	 });
+	 $('input:radio[name=pen]').change(function () {
+             penWidth = $(this).val();
+             //console.log(color);
+	 });
+	 $('input:checkbox[name=visibility]').change(function () {
+	     visible = document.getElementById('visibility').checked;
+	     toggleVisibility();
+	     //console.log(visibility);
+	 })
+
+	 //Download
+	 function downloadCanvas(link, canvasId, filename) {
+	     link.href = document.getElementById(canvasId).toDataURL();
+	     link.download = filename;
+	 }
+	 document.getElementById('download').addEventListener('click', function() {
+	     downloadCanvas(this, 'LightTracer', 'PaperLightTracer.png');
+	 }, false);
+
+	 // Change Image
+	 document.getElementById('randomImage').addEventListener('click', function() {
+	     raster.remove();
+	     getRandomImage();
+	 }, false);
+
+	 // Pen size
+	 document.getElementById('smallPen').addEventListener('click', function() {
+	     penWidth = 3;
+	 }, false);
+	 document.getElementById('bigPen').addEventListener('click', function() {
+	     penWidth = 10;
+	 }, false);
+
+	 // File upload
+	 /* modified from https://codepen.io/doughensel/pen/zGMmop */
+	 function runUpload( file ) {
+	     // http://stackoverflow.com/questions/12570834/how-to-preview-image-get-file-size-image-height-and-width-before-upload
+	     if( file.type === 'image/png'  ||
+		 file.type === 'image/jpg'  ||
+		 file.type === 'image/jpeg' ||
+		 file.type === 'image/gif'  ||
+		 file.type === 'image/bmp'  ){
+		     var reader = new FileReader(),
+			 image = new Image();
+		     reader.readAsDataURL( file );
+		     reader.onload = function( _file ){
+			 raster.remove();
+			 setImage(_file.target.result);
+			 //$('imgPrime').el.src = _file.target.result;
+			 //$('imgPrime').el.style.display = 'inline';
+		     } // END reader.onload()
+	     } // END test if file.type === image
+	 }
+	 if( window.FileReader ){
+	     //Bind the input[type="file"] to the function runUpload()
+	     $('#fileUpload').on('change', function(){ runUpload( this.files[0] ); });
+	 }else{
+	     // Report error message if FileReader is unavilable
+	     var p   = document.createElement( 'p' ),
+		 msg = document.createTextNode( 'Sorry, your browser does not support FileReader.' );
+	     p.className = 'error';
+	     p.appendChild( msg );
+	     $('#userActions').el.innerHTML = '';
+	     $('#userActions').el.appendChild( p );
+	 }
+
+	 // Run to init
+	 getRandomImage()
+
+	</script>
+
+
+    </body>
+</html>
